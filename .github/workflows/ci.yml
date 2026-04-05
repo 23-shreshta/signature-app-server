@@ -1,0 +1,184 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_SERVER: 23-shreshta/signature-app-server
+  IMAGE_NAME_CLIENT: 23-shreshta/signature-app-client
+
+jobs:
+  # ============================================================
+  # STAGE 1: Unit Tests
+  # ============================================================
+  test-server:
+    name: Server Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'npm'
+          cache-dependency-path: 'server/package-lock.json'
+      - name: Install dependencies
+        working-directory: ./server
+        run: npm ci || npm install
+      - name: Run tests
+        working-directory: ./server
+        env:
+          NODE_ENV: test
+          JWT_SECRET: test-secret-for-ci
+        run: npm test
+
+  test-client:
+    name: Client Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'npm'
+          cache-dependency-path: 'client/package-lock.json'
+      - name: Install dependencies
+        working-directory: ./client
+        run: npm ci || npm install --legacy-peer-deps
+      - name: Run tests
+        working-directory: ./client
+        run: npm test -- --watchAll=false
+
+  # ============================================================
+  # STAGE 2: E2E Tests (Selenium + Docker)
+  # ============================================================
+  e2e-tests:
+    name: Selenium E2E Tests
+    runs-on: ubuntu-latest
+    needs: [test-server, test-client]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Create Docker network
+        run: docker network create e2e-network
+
+      - name: Start Selenium Chrome
+        run: |
+          docker run -d \
+            --name selenium \
+            --network e2e-network \
+            -p 4444:4444 \
+            --shm-size=2g \
+            selenium/standalone-chrome:latest
+
+      - name: Build and Start Server
+        run: |
+          docker build -t signature-server ./server
+          docker run -d \
+            --name server \
+            --network e2e-network \
+            -p 5000:5000 \
+            -e PORT=5000 \
+            -e CLIENT_URL=http://client:80 \
+            -e JWT_SECRET=e2e-test-secret \
+            -e NODE_ENV=test \
+            signature-server
+
+      - name: Build and Start Client
+        run: |
+          docker build -t signature-client ./client
+          docker run -d \
+            --name client \
+            --network e2e-network \
+            -p 3000:80 \
+            signature-client
+
+      - name: Wait for services
+        run: |
+          echo "Waiting for services..."
+          sleep 10
+          curl -f http://localhost:5000/ || (docker logs server && exit 1)
+          curl -f http://localhost:3000/ || (docker logs client && exit 1)
+
+      - name: Run E2E tests
+        working-directory: ./e2e
+        env:
+          APP_URL: http://localhost:3000
+          SELENIUM_URL: http://localhost:4444/wd/hub
+        run: |
+          npm install
+          node auth.spec.js
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop server client selenium 2>/dev/null || true
+          docker rm server client selenium 2>/dev/null || true
+          docker network rm e2e-network 2>/dev/null || true
+
+  # ============================================================
+  # STAGE 3: Build & Push to GHCR (Release)
+  # ============================================================
+  release:
+    name: Build & Push to GHCR
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: [e2e-tests]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta-server
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_SERVER }}
+
+      - name: Build and push Server image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_SERVER }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_SERVER }}:${{ github.sha }}
+
+      - name: Build and push Client image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./client
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_CLIENT }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_CLIENT }}:${{ github.sha }}
+
+  # ============================================================
+  # STAGE 4: Deploy to Render
+  # ============================================================
+  deploy:
+    name: Trigger Render Deployment
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: [release]
+    steps:
+      - name: Deploy Server
+        run: |
+          curl -X POST "${{ secrets.RENDER_SERVER_HOOK }}" || echo "Deploy hook failed or not set"
+      
+      - name: Deploy Client
+        run: |
+          curl -X POST "${{ secrets.RENDER_CLIENT_HOOK }}" || echo "Deploy hook failed or not set"

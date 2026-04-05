@@ -1,0 +1,42 @@
+services:
+  # ============================================================
+  # BACKEND SERVICE (Node.js API)
+  # ============================================================
+  - type: web
+    name: signature-server
+    env: docker
+    dockerContext: ./server
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: ohio
+    envVars:
+      - key: PORT
+        value: 5000
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false # User must set this in Render Dashboard
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLIENT_URL
+        fromService:
+          name: signature-client
+          type: web
+          property: host
+
+  # ============================================================
+  # FRONTEND SERVICE (React + Nginx)
+  # ============================================================
+  - type: web
+    name: signature-client
+    env: docker
+    dockerContext: ./client
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: ohio
+    envVars:
+      - key: REACT_APP_API_URL
+        fromService:
+          name: signature-server
+          type: web
+          property: host

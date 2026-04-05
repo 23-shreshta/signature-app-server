@@ -1,0 +1,14 @@
+{
+  "name": "signature-app-e2e",
+  "version": "1.0.0",
+  "description": "E2E automated browser testing for the Signature App",
+  "main": "auth.spec.js",
+  "scripts": {
+    "test": "node auth.spec.js",
+    "test:ci": "SELENIUM_URL=http://localhost:4444/wd/hub APP_URL=http://client:80 node auth.spec.js",
+    "test:local": "APP_URL=http://localhost:3000 node auth.spec.js"
+  },
+  "dependencies": {
+    "selenium-webdriver": "^4.19.0"
+  }
+}

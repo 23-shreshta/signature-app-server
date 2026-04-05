@@ -11,7 +11,7 @@ const protect = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
 
       // Verify token
-      const decoded = jwt.verify(token, 'your-secret-key-here');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-here');
 
       // Get user from the token
       req.user = await User.findById(decoded.id).select('-password');
@@ -24,7 +24,7 @@ const protect = async (req, res, next) => {
   }
 
   if (!token) {
-    res.status(401).json({ message: 'Not authorized to access this route' });
+    return res.status(401).json({ message: 'Not authorized to access this route' });
   }
 };
 
