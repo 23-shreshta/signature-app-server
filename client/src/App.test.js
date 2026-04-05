@@ -3,6 +3,6 @@ import App from './App';
 
 test('renders Sign In heading', () => {
   render(<App />);
-  const headingElement = screen.getByText(/Sign In/i);
+  const headingElement = screen.getByRole('heading', { name: /Sign In/i });
   expect(headingElement).toBeInTheDocument();
 });
