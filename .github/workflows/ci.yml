@@ -76,6 +76,13 @@ jobs:
             --shm-size=2g \
             selenium/standalone-chrome:latest
 
+      - name: Start MongoDB
+        run: |
+          docker run -d \
+            --name mongodb \
+            --network e2e-network \
+            mongo:latest
+
       - name: Build and Start Server
         run: |
           docker build -t signature-server ./server
@@ -85,8 +92,8 @@ jobs:
             -p 5000:5000 \
             -e PORT=5000 \
             -e CLIENT_URL=http://client:80 \
+            -e MONGODB_URI=mongodb://mongodb:27017/signature-app \
             -e JWT_SECRET=e2e-test-secret \
-            -e NODE_ENV=test \
             signature-server
 
       - name: Build and Start Client
@@ -117,8 +124,8 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker stop server client selenium 2>/dev/null || true
-          docker rm server client selenium 2>/dev/null || true
+          docker stop server client selenium mongodb 2>/dev/null || true
+          docker rm server client selenium mongodb 2>/dev/null || true
           docker network rm e2e-network 2>/dev/null || true
 
   # ============================================================
