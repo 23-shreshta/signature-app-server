@@ -64,6 +64,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'npm'
+          cache-dependency-path: 'e2e/package-lock.json'
+      
       - name: Create Docker network
         run: docker network create e2e-network
 
@@ -82,6 +89,14 @@ jobs:
             --name mongodb \
             --network e2e-network \
             mongo:latest
+          
+      - name: Wait for MongoDB
+        run: |
+          echo "Waiting for MongoDB to be ready..."
+          sleep 5
+          docker exec mongodb mongosh --eval "db.adminCommand('ping')" || \
+          docker exec mongodb mongo --eval "db.adminCommand('ping')" || \
+          sleep 10
 
       - name: Build and Start Server
         run: |
@@ -118,7 +133,7 @@ jobs:
           APP_URL: http://client
           SELENIUM_URL: http://localhost:4444/wd/hub
         run: |
-          npm install
+          npm ci || npm install
           node auth.spec.js
       
       - name: Debug Logs on failure

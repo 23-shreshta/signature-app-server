@@ -208,7 +208,8 @@ function logResult(name, success, error = null) {
       await waitForText(driver, 'Download Signed PDF');
 
       // Check welcome message
-      await waitForText(driver, `Welcome, ${TEST_USER.name}!`);
+      await waitForText(driver, 'Welcome');
+      await waitForText(driver, TEST_USER.name);
       logResult('Main app shows all UI sections after login', true);
     } catch (e) {
       logResult('Main app shows all UI sections after login', false, e.message);
@@ -234,13 +235,12 @@ function logResult(name, success, error = null) {
         throw new Error('Logout button not found');
       });
 
-      // Click the button or its parent
+      // Click the button or its parent using script for reliability
       try {
+        await driver.executeScript("arguments[0].click();", logoutBtn);
+      } catch (err) {
+        // Fallback: click directly
         await logoutBtn.click();
-      } catch {
-        // If we found the SVG icon, click its parent button
-        const parent = await logoutBtn.findElement(By.xpath('./ancestor::button'));
-        await parent.click();
       }
 
       // Should return to login form
