@@ -294,7 +294,7 @@ function App() {
           <Typography variant="body1" sx={{ mr: 2 }}>
             Welcome, {user?.name}!
           </Typography>
-          <IconButton color="inherit" onClick={handleLogout}>
+          <IconButton color="inherit" onClick={handleLogout} aria-label="logout">
             <LogoutIcon />
           </IconButton>
         </Toolbar>

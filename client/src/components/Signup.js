@@ -180,7 +180,7 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
             </Alert>
           )}
 
-          <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
+          <Box component="form" noValidate onSubmit={handleSubmit} sx={{ width: '100%' }}>
             <TextField
               margin="normal"
               required
