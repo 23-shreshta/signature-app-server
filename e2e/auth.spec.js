@@ -163,10 +163,19 @@ function logResult(name, success, error = null) {
     // TEST 5: Successful Registration
     // ----------------------------------------------------------
     try {
-      // Fix the confirm password field
+      // Re-enter both password fields to be 100% sure they are in sync
+      const pwField = await waitForElement(driver, By.id('password'));
+      await pwField.click();
+      await pwField.sendKeys(Key.CONTROL, 'a', Key.NULL, Key.BACK_SPACE);
+      await pwField.sendKeys(TEST_USER.password);
+      
       const confirmPwField = await waitForElement(driver, By.id('confirmPassword'));
-      await confirmPwField.clear();
+      await confirmPwField.click();
+      await confirmPwField.sendKeys(Key.CONTROL, 'a', Key.NULL, Key.BACK_SPACE);
       await confirmPwField.sendKeys(TEST_USER.password);
+
+      // Brief sleep for React state to update
+      await driver.sleep(500);
 
       // Submit
       const submitBtn = await driver.findElement(
