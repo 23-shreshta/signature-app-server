@@ -120,6 +120,16 @@ jobs:
         run: |
           npm install
           node auth.spec.js
+      
+      - name: Debug Logs on failure
+        if: failure()
+        run: |
+          echo "SERVER LOGS:"
+          docker logs server
+          echo "CLIENT LOGS:"
+          docker logs client
+          echo "MONGODB LOGS:"
+          docker logs mongodb
 
       - name: Cleanup
         if: always()

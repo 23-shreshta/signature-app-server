@@ -179,7 +179,15 @@ function logResult(name, success, error = null) {
       await waitForText(driver, 'Upload PDF');
       logResult('Successful registration redirects to main app', true);
     } catch (e) {
-      logResult('Successful registration redirects to main app', false, e.message);
+      // Diagnostic: Check if there's a visible error alert on the screen
+      let onScreenError = '';
+      try {
+        const errorEl = await driver.findElement(By.css('.MuiAlert-message, [role="alert"]'));
+        onScreenError = await errorEl.getText();
+      } catch (err) {
+        onScreenError = 'No error alert visible';
+      }
+      logResult('Successful registration redirects to main app', false, `${e.message} (On-screen error: ${onScreenError})`);
     }
 
     // ----------------------------------------------------------
