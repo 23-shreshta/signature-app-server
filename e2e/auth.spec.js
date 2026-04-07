@@ -207,9 +207,16 @@ function logResult(name, success, error = null) {
       await waitForText(driver, 'Type Your Signature');
       await waitForText(driver, 'Download Signed PDF');
 
-      // Check welcome message
-      await waitForText(driver, 'Welcome');
-      await waitForText(driver, TEST_USER.name);
+      // Check welcome message with extra logging
+      try {
+        await waitForText(driver, 'Welcome');
+        await waitForText(driver, TEST_USER.name);
+      } catch (err) {
+        // Try to get the text of the entire body or a generic container to see what's there
+        const bodyText = await driver.findElement(By.tagName('body')).getText();
+        console.log('  DEBUG: Page text when Welcome failed:', bodyText);
+        throw new Error(`Welcome message not found. Expected "${TEST_USER.name}" to be present. ${err.message}`);
+      }
       logResult('Main app shows all UI sections after login', true);
     } catch (e) {
       logResult('Main app shows all UI sections after login', false, e.message);
@@ -235,12 +242,15 @@ function logResult(name, success, error = null) {
         throw new Error('Logout button not found');
       });
 
-      // Click the button or its parent using script for reliability
+      // Click the button using a sequence of methods for reliability
       try {
-        await driver.executeScript("arguments[0].click();", logoutBtn);
-      } catch (err) {
-        // Fallback: click directly
         await logoutBtn.click();
+      } catch (err) {
+        try {
+          await driver.executeScript("arguments[0].click();", logoutBtn);
+        } catch (scriptErr) {
+          await logoutBtn.sendKeys(Key.ENTER);
+        }
       }
 
       // Should return to login form
